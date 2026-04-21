@@ -1,0 +1,203 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Standalone Image Optimizer</title>
+    <style>
+        body {
+            font-family: system-ui;
+            padding: 20px;
+            line-height: 1.5;
+            max-width: 600px;
+            margin: 0 auto;
+            background: #f4f4f9;
+        }
+
+        .box {
+            background: #fff;
+            padding: 20px;
+            border-radius: 8px;
+            box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1);
+        }
+
+        h1 {
+            margin-top: 0;
+            font-size: 1.5rem;
+            border-bottom: 2px solid #eee;
+            padding-bottom: 10px;
+        }
+
+        .upload {
+            border: 2px dashed #ccc;
+            padding: 40px;
+            text-align: center;
+            cursor: pointer;
+            margin: 20px 0;
+            border-radius: 8px;
+        }
+
+        .upload:hover {
+            border-color: #007bff;
+            background: #f0f7ff;
+        }
+
+        input[type="file"] {
+            display: none;
+        }
+
+        img {
+            max-width: 100%;
+            height: auto;
+            display: block;
+            margin: 10px 0;
+            border-radius: 4px;
+        }
+
+        .controls {
+            margin-top: 20px;
+            border-top: 1px solid #eee;
+            padding-top: 20px;
+        }
+
+        .row {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 10px;
+        }
+
+        button {
+            background: #007bff;
+            color: white;
+            border: none;
+            padding: 10px 20px;
+            border-radius: 4px;
+            cursor: pointer;
+            width: 100%;
+            font-weight: bold;
+        }
+
+        button:hover {
+            background: #0056b3;
+        }
+
+        #stats {
+            margin-top: 15px;
+            font-size: 0.9rem;
+            color: #666;
+        }
+    </style>
+</head>
+
+<body>
+    <div class="box">
+        <h1>Optimizer</h1>
+        <div id="drop-zone" class="upload">
+            Click or Drop Image Here
+            <input type="file" id="file-input" accept="image/*">
+        </div>
+
+        <div id="ui" style="display:none">
+            <div class="row">
+                <label>Quality:</label>
+                <input type="range" id="q-range" min="1" max="100" value="80">
+                <span id="q-label">80%</span>
+            </div>
+
+            <p><strong>Preview:</strong></p>
+            <img id="preview" src="" alt="">
+
+            <div id="stats">
+                Original: <span id="s-orig">-</span><br>
+                Optimized: <span id="s-new">-</span> (<span id="s-red">-</span>)
+            </div>
+
+            <button id="dl-btn" style="margin-top:20px">Download Optimized</button>
+        </div>
+    </div>
+
+    <script>
+        const $ = (id) => document.getElementById(id);
+        const input = $('file-input');
+        const zone = $('drop-zone');
+        const ui = $('ui');
+        const qRange = $('q-range');
+        const qLabel = $('q-label');
+        const preview = $('preview');
+        const dlBtn = $('dl-btn');
+
+        let originalImg = null;
+        let originalSize = 0;
+        let blobUrl = null;
+
+        zone.onclick = () => input.click();
+        input.onchange = (e) => e.target.files[0] && loadFile(e.target.files[0]);
+
+        // Drag & Drop
+        zone.ondragover = (e) => { e.preventDefault(); zone.style.borderColor = '#007bff'; };
+        zone.ondragleave = () => zone.style.borderColor = '#ccc';
+        zone.ondrop = (e) => {
+            e.preventDefault();
+            zone.style.borderColor = '#ccc';
+            if (e.dataTransfer.files[0]) loadFile(e.dataTransfer.files[0]);
+        };
+
+        function loadFile(file) {
+            originalSize = file.size;
+            $('s-orig').innerText = formatSize(file.size);
+
+            const reader = new FileReader();
+            reader.onload = (e) => {
+                const img = new Image();
+                img.onload = () => {
+                    originalImg = img;
+                    ui.style.display = 'block';
+                    zone.style.display = 'none';
+                    update();
+                };
+                img.src = e.target.result;
+            };
+            reader.readAsDataURL(file);
+        }
+
+        function update() {
+            if (!originalImg) return;
+            qLabel.innerText = qRange.value + '%';
+
+            const canvas = document.createElement('canvas');
+            canvas.width = originalImg.width;
+            canvas.height = originalImg.height;
+            const ctx = canvas.getContext('2d');
+            ctx.drawImage(originalImg, 0, 0);
+
+            canvas.toBlob((blob) => {
+                if (blobUrl) URL.revokeObjectURL(blobUrl);
+                blobUrl = URL.createObjectURL(blob);
+                preview.src = blobUrl;
+
+                $('s-new').innerText = formatSize(blob.size);
+                const red = ((originalSize - blob.size) / originalSize * 100).toFixed(1);
+                $('s-red').innerText = red + '% reduction';
+            }, 'image/jpeg', qRange.value / 100);
+        }
+
+        qRange.oninput = update;
+
+        dlBtn.onclick = () => {
+            const a = document.createElement('a');
+            a.href = blobUrl;
+            a.download = 'optimized.jpg';
+            a.click();
+        };
+
+        function formatSize(b) {
+            if (b < 1024) return b + ' B';
+            if (b < 1048576) return (b / 1024).toFixed(1) + ' KB';
+            return (b / 1048576).toFixed(1) + ' MB';
+        }
+    </script>
+</body>
+
+</html>
